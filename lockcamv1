@@ -1,22 +1,136 @@
-local Camera = game.Workspace.CurrentCamera
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local fov = 25
+
 local RunService = game:GetService("RunService")
+
 local UserInputService = game:GetService("UserInputService")
 
-local AimlockEnabled = false
-local Target = nil
-local CircleSize = 60 -- 🎯 Kích thước hình tròn (có thể chỉnh)
-local CircleOpacity = 0.5 -- 🎨 Độ trong suốt (0 = trong suốt, 1 = đậm)
-local CircleColor = Color3.fromRGB(128, 0, 128) -- 🎨 Màu sắc hình tròn (tím)
+local Players = game:GetService("Players")
 
--- 📌 Tạo GUI
+local Cam = game.Workspace.CurrentCamera
+
+
+
+local FOVring = Drawing.new("Circle")
+
+FOVring.Visible = true
+
+FOVring.Thickness = 2
+
+FOVring.Color = Color3.fromRGB(128, 0, 128) -- Purple color
+
+FOVring.Filled = false
+
+FOVring.Radius = fov
+
+FOVring.Position = Cam.ViewportSize / 2
+
+
+
+local function updateDrawings()
+
+    local camViewportSize = Cam.ViewportSize
+
+    FOVring.Position = camViewportSize / 2
+
+end
+
+
+
+local function onKeyDown(input)
+
+    if input.KeyCode == Enum.KeyCode.Delete then
+
+        RunService:UnbindFromRenderStep("FOVUpdate")
+
+        FOVring:Remove()
+
+    end
+
+end
+
+
+
+UserInputService.InputBegan:Connect(onKeyDown)
+
+
+
+local function lookAt(target)
+
+    local lookVector = (target - Cam.CFrame.Position).unit
+
+    local newCFrame = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookVector)
+
+    Cam.CFrame = newCFrame
+
+end
+
+
+
+local function getClosestPlayerInFOV(trg_part)
+
+    local nearest = nil
+
+    local last = math.huge
+
+    local playerMousePos = Cam.ViewportSize / 2
+
+
+
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= Players.LocalPlayer then
+
+            local part = player.Character and player.Character:FindFirstChild(trg_part)
+
+            if part then
+
+                local ePos, isVisible = Cam:WorldToViewportPoint(part.Position)
+
+                local distance = (Vector2.new(ePos.x, ePos.y) - playerMousePos).Magnitude
+
+
+
+                if distance < last and isVisible and distance < fov then
+
+                    last = distance
+
+                    nearest = player
+
+                end
+
+            end
+
+        end
+
+    end
+
+
+
+    return nearest
+
+end
+
+
+
+RunService.RenderStepped:Connect(function()
+
+    updateDrawings()
+
+    local closest = getClosestPlayerInFOV("Head")
+
+    if closest and closest.Character:FindFirstChild("Head") then
+
+        lookAt(closest.Character.Head.Position)
+
+    end
+
+end)
+
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local AimButton = Instance.new("TextButton", ScreenGui)
 local Circle = Instance.new("Frame", ScreenGui)
 local DragFrame = Instance.new("Frame", ScreenGui)
 
--- 🔘 Cài đặt nút ON/OFF
 AimButton.Size = UDim2.new(0, 100, 0, 50)
 AimButton.Position = UDim2.new(0.8, 0, 0.8, 0)
 AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -28,115 +142,8 @@ AimButton.BorderSizePixel = 2
 AimButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
 AimButton.Draggable = true -- Kéo nút đi bất kỳ đâu
 
--- 📌 Tạo vùng kéo GUI
 DragFrame.Size = UDim2.new(0, 100, 0, 50)
 DragFrame.Position = AimButton.Position
 DragFrame.BackgroundTransparency = 1
 DragFrame.Draggable = true -- Cho phép kéo
 DragFrame.Parent = ScreenGui
-
--- 🎯 Cài đặt hình tròn
-Circle.Size = UDim2.new(0, CircleSize, 0, CircleSize)
-Circle.Position = UDim2.new(0.5, -CircleSize/2, 0.5, -CircleSize/2)
-Circle.BackgroundColor3 = CircleColor
-Circle.BackgroundTransparency = CircleOpacity
-Circle.BorderSizePixel = 2
-Circle.BorderColor3 = Color3.fromRGB(255, 255, 255)
-Circle.Visible = false
-
--- 🔍 Tìm người chơi gần nhất
-function GetClosestPlayer()
-    local MaxDistance = math.huge
-    local ClosestPlayer = nil
-
-    for _, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-            local Character = Player.Character
-            local Head = Character:FindFirstChild("Head")
-
-            if Head then
-                local ScreenPoint = Camera:WorldToViewportPoint(Head.Position)
-                local Distance = (Vector2.new(ScreenPoint.X, ScreenPoint.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).magnitude
-
-                if Distance < MaxDistance then
-                    MaxDistance = Distance
-                    ClosestPlayer = Character
-                end
-            end
-        end
-    end
-    return ClosestPlayer
-end
-
--- 🔘 Bật/tắt Aimlock bằng nút
-AimButton.MouseButton1Click:Connect(function()
-    AimlockEnabled = not AimlockEnabled
-
-    if AimlockEnabled then
-        Target = GetClosestPlayer()
-        Circle.Visible = true
-        AimButton.Text = "ON"
-        AimButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        Target = nil
-        Circle.Visible = false
-        AimButton.Text = "OFF"
-        AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    end
-end)
-
--- 🎯 Aimlock khi hình tròn gần đầu đối thủ
-RunService.RenderStepped:Connect(function()
-    if AimlockEnabled then
-        local Closest = GetClosestPlayer()
-
-        if Closest and Closest:FindFirstChild("Head") then
-            local HeadPos = Camera:WorldToViewportPoint(Closest.Head.Position)
-            local DistanceToCircle = (Vector2.new(HeadPos.X, HeadPos.Y) - Vector2.new(Circle.Position.X, Circle.Position.Y)).magnitude
-
-            -- Nếu hình tròn gần đầu đối thủ, tự động lock
-            if DistanceToCircle < CircleSize / 2 then
-                Target = Closest
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Head.Position)
-            end
-        end
-    end
-end)
-
--- 📌 Kéo hình tròn ra khỏi đối thủ khi di chuyển camera
-UserInputService.InputChanged:Connect(function(input)
-    if AimlockEnabled and Target and input.UserInputType == Enum.UserInputType.MouseMovement then
-        Target = nil -- Hủy Aimlock khi camera di chuyển ra chỗ khác
-    end
-end)
-
--- 📌 Kéo GUI đến vị trí khác
-local dragging, dragInput, dragStart, startPos
-
-DragFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = DragFrame.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-DragFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging and dragInput then
-        local delta = dragInput.Position - dragStart
-        DragFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        AimButton.Position = DragFrame.Position -- Di chuyển nút theo
-    end
-end)
