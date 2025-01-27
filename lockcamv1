@@ -1,4 +1,4 @@
-local fov = 25 -- 🎯 Kích thước hình tròn (có thể chỉnh)
+local fov = 50 -- 🎯 Kích thước hình tròn (có thể chỉnh)
 local FOVEnabled = false -- Trạng thái Aimlock (tắt mặc định)
 
 local RunService = game:GetService("RunService")
@@ -31,13 +31,13 @@ DragFrame.BackgroundTransparency = 1
 DragFrame.Draggable = true -- Cho phép kéo
 DragFrame.Parent = ScreenGui
 
--- 🎯 Cài đặt hình tròn FOV
+-- 🎯 Cài đặt hình tròn FOV (Chỉ viền)
 local FOVring = Drawing.new("Circle")
 FOVring.Visible = false
-FOVring.Thickness = 2
+FOVring.Thickness = 2 -- Độ dày viền
 FOVring.Color = Color3.fromRGB(128, 0, 128) -- 🎨 Màu tím
-FOVring.Filled = true
-FOVring.Transparency = 0.5 -- Độ trong suốt (0 = trong suốt, 1 = đậm)
+FOVring.Filled = false -- ❌ Không đổ màu bên trong
+FOVring.Transparency = 1 -- Hiển thị rõ viền
 FOVring.Radius = fov
 FOVring.Position = Cam.ViewportSize / 2
 
