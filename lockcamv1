@@ -6,12 +6,15 @@ local UserInputService = game:GetService("UserInputService")
 
 local AimlockEnabled = false
 local Target = nil
-local CircleSize = 50 -- 🎯 Kích thước hình tròn (có thể chỉnh)
+local CircleSize = 60 -- 🎯 Kích thước hình tròn (có thể chỉnh)
+local CircleOpacity = 0.5 -- 🎨 Độ trong suốt (0 = trong suốt, 1 = đậm)
+local CircleColor = Color3.fromRGB(128, 0, 128) -- 🎨 Màu sắc hình tròn (tím)
 
 -- 📌 Tạo GUI
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local AimButton = Instance.new("TextButton", ScreenGui)
 local Circle = Instance.new("Frame", ScreenGui)
+local DragFrame = Instance.new("Frame", ScreenGui)
 
 -- 🔘 Cài đặt nút ON/OFF
 AimButton.Size = UDim2.new(0, 100, 0, 50)
@@ -23,12 +26,20 @@ AimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 AimButton.Font = Enum.Font.SourceSansBold
 AimButton.BorderSizePixel = 2
 AimButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+AimButton.Draggable = true -- Kéo nút đi bất kỳ đâu
+
+-- 📌 Tạo vùng kéo GUI
+DragFrame.Size = UDim2.new(0, 100, 0, 50)
+DragFrame.Position = AimButton.Position
+DragFrame.BackgroundTransparency = 1
+DragFrame.Draggable = true -- Cho phép kéo
+DragFrame.Parent = ScreenGui
 
 -- 🎯 Cài đặt hình tròn
 Circle.Size = UDim2.new(0, CircleSize, 0, CircleSize)
 Circle.Position = UDim2.new(0.5, -CircleSize/2, 0.5, -CircleSize/2)
-Circle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-Circle.BackgroundTransparency = 0.5
+Circle.BackgroundColor3 = CircleColor
+Circle.BackgroundTransparency = CircleOpacity
 Circle.BorderSizePixel = 2
 Circle.BorderColor3 = Color3.fromRGB(255, 255, 255)
 Circle.Visible = false
@@ -74,11 +85,58 @@ AimButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- 🎯 Khóa tâm vào mục tiêu & hiển thị hình tròn
+-- 🎯 Aimlock khi hình tròn gần đầu đối thủ
 RunService.RenderStepped:Connect(function()
-    if AimlockEnabled and Target and Target:FindFirstChild("Head") then
-        local HeadPos = Camera:WorldToViewportPoint(Target.Head.Position)
-        Circle.Position = UDim2.new(0, HeadPos.X - CircleSize/2, 0, HeadPos.Y - CircleSize/2)
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Head.Position)
+    if AimlockEnabled then
+        local Closest = GetClosestPlayer()
+
+        if Closest and Closest:FindFirstChild("Head") then
+            local HeadPos = Camera:WorldToViewportPoint(Closest.Head.Position)
+            local DistanceToCircle = (Vector2.new(HeadPos.X, HeadPos.Y) - Vector2.new(Circle.Position.X, Circle.Position.Y)).magnitude
+
+            -- Nếu hình tròn gần đầu đối thủ, tự động lock
+            if DistanceToCircle < CircleSize / 2 then
+                Target = Closest
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Head.Position)
+            end
+        end
+    end
+end)
+
+-- 📌 Kéo hình tròn ra khỏi đối thủ khi di chuyển camera
+UserInputService.InputChanged:Connect(function(input)
+    if AimlockEnabled and Target and input.UserInputType == Enum.UserInputType.MouseMovement then
+        Target = nil -- Hủy Aimlock khi camera di chuyển ra chỗ khác
+    end
+end)
+
+-- 📌 Kéo GUI đến vị trí khác
+local dragging, dragInput, dragStart, startPos
+
+DragFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = DragFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+DragFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        DragFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        AimButton.Position = DragFrame.Position -- Di chuyển nút theo
     end
 end)
