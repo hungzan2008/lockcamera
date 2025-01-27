@@ -31,15 +31,25 @@ DragFrame.BackgroundTransparency = 1
 DragFrame.Draggable = true -- Cho phép kéo
 DragFrame.Parent = ScreenGui
 
--- 🎯 Cài đặt hình tròn FOV (Chỉ viền)
-local FOVring = Drawing.new("Circle")
-FOVring.Visible = false
-FOVring.Thickness = 2 -- Độ dày viền
-FOVring.Color = Color3.fromRGB(128, 0, 128) -- 🎨 Màu tím
-FOVring.Filled = false -- ❌ Không đổ màu bên trong
-FOVring.Transparency = 1 -- Hiển thị rõ viền
-FOVring.Radius = fov
-FOVring.Position = Cam.ViewportSize / 2
+-- 🎯 Vòng tròn ngoài (Viền)
+local OuterFOV = Drawing.new("Circle")
+OuterFOV.Visible = false
+OuterFOV.Thickness = 5 -- 🔥 Độ dày viền
+OuterFOV.Color = Color3.fromRGB(128, 0, 128) -- 🎨 Màu tím
+OuterFOV.Filled = true -- Để tạo viền
+OuterFOV.Transparency = 1
+OuterFOV.Radius = fov + 2 -- To hơn một chút để tạo viền
+OuterFOV.Position = Cam.ViewportSize / 2
+
+-- 🎯 Vòng tròn trong (Làm rỗng)
+local InnerFOV = Drawing.new("Circle")
+InnerFOV.Visible = false
+InnerFOV.Thickness = 1
+InnerFOV.Color = Color3.fromRGB(0, 0, 0) -- Cùng màu với nền để làm rỗng
+InnerFOV.Filled = true
+InnerFOV.Transparency = 1
+InnerFOV.Radius = fov -- Nhỏ hơn vòng tròn ngoài
+InnerFOV.Position = Cam.ViewportSize / 2
 
 -- 🔍 Tìm người chơi gần nhất trong FOV
 local function getClosestPlayerInFOV(trg_part)
@@ -69,11 +79,13 @@ AimButton.MouseButton1Click:Connect(function()
     FOVEnabled = not FOVEnabled
 
     if FOVEnabled then
-        FOVring.Visible = true
+        OuterFOV.Visible = true
+        InnerFOV.Visible = true
         AimButton.Text = "ON"
         AimButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     else
-        FOVring.Visible = false
+        OuterFOV.Visible = false
+        InnerFOV.Visible = false
         AimButton.Text = "OFF"
         AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     end
@@ -81,7 +93,8 @@ end)
 
 -- 🔄 Cập nhật vị trí hình tròn FOV & Aimlock
 RunService.RenderStepped:Connect(function()
-    FOVring.Position = Cam.ViewportSize / 2
+    OuterFOV.Position = Cam.ViewportSize / 2
+    InnerFOV.Position = Cam.ViewportSize / 2
 
     if FOVEnabled then
         local closest = getClosestPlayerInFOV("Head")
@@ -121,4 +134,3 @@ RunService.RenderStepped:Connect(function()
         DragFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         AimButton.Position = DragFrame.Position -- Di chuyển nút theo
     end
-end)
