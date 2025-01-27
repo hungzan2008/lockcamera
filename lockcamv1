@@ -1,4 +1,4 @@
-local fov = 50 -- 🎯 Kích thước hình tròn (có thể chỉnh)
+local fov = 25 -- 🎯 Kích thước hình tròn (có thể chỉnh)
 local FOVEnabled = false -- Trạng thái Aimlock (tắt mặc định)
 
 local RunService = game:GetService("RunService")
