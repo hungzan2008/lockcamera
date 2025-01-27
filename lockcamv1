@@ -1,1 +1,84 @@
+local Camera = game.Workspace.CurrentCamera
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
+local AimlockEnabled = false
+local Target = nil
+local CircleSize = 50 -- 🎯 Kích thước hình tròn (có thể chỉnh)
+
+-- 📌 Tạo GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local AimButton = Instance.new("TextButton", ScreenGui)
+local Circle = Instance.new("Frame", ScreenGui)
+
+-- 🔘 Cài đặt nút ON/OFF
+AimButton.Size = UDim2.new(0, 100, 0, 50)
+AimButton.Position = UDim2.new(0.8, 0, 0.8, 0)
+AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AimButton.Text = "OFF"
+AimButton.TextSize = 20
+AimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimButton.Font = Enum.Font.SourceSansBold
+AimButton.BorderSizePixel = 2
+AimButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+
+-- 🎯 Cài đặt hình tròn
+Circle.Size = UDim2.new(0, CircleSize, 0, CircleSize)
+Circle.Position = UDim2.new(0.5, -CircleSize/2, 0.5, -CircleSize/2)
+Circle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+Circle.BackgroundTransparency = 0.5
+Circle.BorderSizePixel = 2
+Circle.BorderColor3 = Color3.fromRGB(255, 255, 255)
+Circle.Visible = false
+
+-- 🔍 Tìm người chơi gần nhất
+function GetClosestPlayer()
+    local MaxDistance = math.huge
+    local ClosestPlayer = nil
+
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            local Character = Player.Character
+            local Head = Character:FindFirstChild("Head")
+
+            if Head then
+                local ScreenPoint = Camera:WorldToViewportPoint(Head.Position)
+                local Distance = (Vector2.new(ScreenPoint.X, ScreenPoint.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).magnitude
+
+                if Distance < MaxDistance then
+                    MaxDistance = Distance
+                    ClosestPlayer = Character
+                end
+            end
+        end
+    end
+    return ClosestPlayer
+end
+
+-- 🔘 Bật/tắt Aimlock bằng nút
+AimButton.MouseButton1Click:Connect(function()
+    AimlockEnabled = not AimlockEnabled
+
+    if AimlockEnabled then
+        Target = GetClosestPlayer()
+        Circle.Visible = true
+        AimButton.Text = "ON"
+        AimButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        Target = nil
+        Circle.Visible = false
+        AimButton.Text = "OFF"
+        AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end
+end)
+
+-- 🎯 Khóa tâm vào mục tiêu & hiển thị hình tròn
+RunService.RenderStepped:Connect(function()
+    if AimlockEnabled and Target and Target:FindFirstChild("Head") then
+        local HeadPos = Camera:WorldToViewportPoint(Target.Head.Position)
+        Circle.Position = UDim2.new(0, HeadPos.X - CircleSize/2, 0, HeadPos.Y - CircleSize/2)
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Head.Position)
+    end
+end)
