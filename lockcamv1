@@ -1,124 +1,72 @@
-local fov = 25 -- 🎯 Kích thước hình tròn (có thể chỉnh)
-local FOVEnabled = false -- Trạng thái Aimlock (tắt mặc định)
-
+local fov = 25
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Cam = game.Workspace.CurrentCamera
 
--- 📌 Tạo GUI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local AimButton = Instance.new("TextButton", ScreenGui)
-local DragFrame = Instance.new("Frame", ScreenGui)
-
--- 🔘 Cài đặt nút ON/OFF
-AimButton.Size = UDim2.new(0, 100, 0, 50)
-AimButton.Position = UDim2.new(0.8, 0, 0.8, 0)
-AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-AimButton.Text = "OFF"
-AimButton.TextSize = 20
-AimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-AimButton.Font = Enum.Font.SourceSansBold
-AimButton.BorderSizePixel = 2
-AimButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
-AimButton.Parent = ScreenGui
-AimButton.Draggable = true -- Kéo nút đi bất kỳ đâu
-
--- 📌 Tạo vùng kéo GUI
-DragFrame.Size = UDim2.new(0, 100, 0, 50)
-DragFrame.Position = AimButton.Position
-DragFrame.BackgroundTransparency = 1
-DragFrame.Draggable = true -- Cho phép kéo
-DragFrame.Parent = ScreenGui
-
--- 🎯 Cài đặt hình tròn FOV
 local FOVring = Drawing.new("Circle")
 FOVring.Visible = false
 FOVring.Thickness = 2
-FOVring.Color = Color3.fromRGB(128, 0, 128) -- 🎨 Màu tím
-FOVring.Filled = true
-FOVring.Transparency = 0.5 -- Độ trong suốt (0 = trong suốt, 1 = đậm)
+FOVring.Color = Color3.fromRGB(128, 0, 128) -- Màu tím
+FOVring.Filled = false
 FOVring.Radius = fov
 FOVring.Position = Cam.ViewportSize / 2
 
--- 🔍 Tìm người chơi gần nhất trong FOV
-local function getClosestPlayerInFOV(trg_part)
-    local nearest = nil
-    local last = math.huge
+local aimEnabled = false -- Trạng thái bật/tắt nhắm mục tiêu
+
+-- Cập nhật vị trí hình tròn FOV
+local function updateDrawings()
+    FOVring.Position = Cam.ViewportSize / 2
+end
+
+-- Nhìn vào mục tiêu
+local function lookAt(target)
+    Cam.CFrame = CFrame.new(Cam.CFrame.Position, target)
+end
+
+-- Tìm người chơi gần nhất trong FOV
+local function getClosestPlayerInFOV()
+    local nearest, last = nil, math.huge
     local playerMousePos = Cam.ViewportSize / 2
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer then
-            local part = player.Character and player.Character:FindFirstChild(trg_part)
-            if part then
-                local ePos, isVisible = Cam:WorldToViewportPoint(part.Position)
-                local distance = (Vector2.new(ePos.x, ePos.y) - playerMousePos).Magnitude
+            local head = player.Character and player.Character:FindFirstChild("Head")
+            if head then
+                local ePos, isVisible = Cam:WorldToViewportPoint(head.Position)
+                local distance = (Vector2.new(ePos.X, ePos.Y) - playerMousePos).Magnitude
 
                 if distance < last and isVisible and distance < fov then
-                    last = distance
-                    nearest = player
+                    last, nearest = distance, head.Position
                 end
             end
         end
     end
+
     return nearest
 end
 
--- 📌 Bật/tắt Aimlock bằng nút
-AimButton.MouseButton1Click:Connect(function()
-    FOVEnabled = not FOVEnabled
-
-    if FOVEnabled then
-        FOVring.Visible = true
-        AimButton.Text = "ON"
-        AimButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        FOVring.Visible = false
-        AimButton.Text = "OFF"
-        AimButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    end
-end)
-
--- 🔄 Cập nhật vị trí hình tròn FOV & Aimlock
+-- Cập nhật khi bật tính năng
 RunService.RenderStepped:Connect(function()
-    FOVring.Position = Cam.ViewportSize / 2
-
-    if FOVEnabled then
-        local closest = getClosestPlayerInFOV("Head")
-        if closest and closest.Character:FindFirstChild("Head") then
-            local lookVector = (closest.Character.Head.Position - Cam.CFrame.Position).unit
-            Cam.CFrame = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookVector)
+    updateDrawings()
+    if aimEnabled then
+        local target = getClosestPlayerInFOV()
+        if target then
+            lookAt(target)
         end
     end
 end)
 
--- 📌 Kéo GUI đến vị trí khác
-local dragging, dragInput, dragStart, startPos
+-- **Tạo GUI chỉ có 1 nút**
+local ScreenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
+local Button = Instance.new("TextButton", ScreenGui)
+Button.Size, Button.Position = UDim2.new(0, 100, 0, 50), UDim2.new(0.8, 0, 0.75, 0)
+Button.BackgroundColor3, Button.TextScaled = Color3.fromRGB(255, 0, 0), true
+Button.Text = "Off"
 
-DragFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = DragFrame.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-DragFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging and dragInput then
-        local delta = dragInput.Position - dragStart
-        DragFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        AimButton.Position = DragFrame.Position -- Di chuyển nút theo
-    end
+-- Chuyển đổi bật/tắt khi bấm nút
+Button.MouseButton1Click:Connect(function()
+    aimEnabled = not aimEnabled
+    FOVring.Visible = aimEnabled
+    Button.Text = aimEnabled and "On" or "Off"
+    Button.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 end)
