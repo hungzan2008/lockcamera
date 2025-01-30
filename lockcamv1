@@ -2,6 +2,7 @@ local fov = 25
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Cam = game.Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
 local FOVring = Drawing.new("Circle")
 FOVring.Visible = false
@@ -29,7 +30,7 @@ local function getClosestPlayerInFOV()
     local playerMousePos = Cam.ViewportSize / 2
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= Players.LocalPlayer then
+        if player ~= LocalPlayer then
             local head = player.Character and player.Character:FindFirstChild("Head")
             if head then
                 local ePos, isVisible = Cam:WorldToViewportPoint(head.Position)
@@ -56,17 +57,42 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- **Tạo GUI chỉ có 1 nút**
-local ScreenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
-local Button = Instance.new("TextButton", ScreenGui)
-Button.Size, Button.Position = UDim2.new(0, 100, 0, 50), UDim2.new(0.8, 0, 0.75, 0)
-Button.BackgroundColor3, Button.TextScaled = Color3.fromRGB(255, 0, 0), true
-Button.Text = "Off"
+-- Hàm tạo GUI cố định, dịch chuyển theo yêu cầu
+local function createGUI()
+    if LocalPlayer:FindFirstChild("PlayerGui") then
+        -- Kiểm tra nếu GUI đã tồn tại thì xóa
+        local oldGui = LocalPlayer.PlayerGui:FindFirstChild("AimGui")
+        if oldGui then
+            oldGui:Destroy()
+        end
 
--- Chuyển đổi bật/tắt khi bấm nút
-Button.MouseButton1Click:Connect(function()
-    aimEnabled = not aimEnabled
-    FOVring.Visible = aimEnabled
-    Button.Text = aimEnabled and "On" or "Off"
-    Button.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "AimGui"
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+        local Button = Instance.new("TextButton", ScreenGui)
+        Button.Size = UDim2.new(0, 100, 0, 40) -- Nhỏ gọn
+        Button.Position = UDim2.new(0, 160, 0, -60) -- Di chuyển sang phải 1,5 ô
+        Button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        Button.TextScaled = true
+        Button.Text = "On"
+
+        -- Chuyển đổi bật/tắt khi bấm nút
+        Button.MouseButton1Click:Connect(function()
+            aimEnabled = not aimEnabled
+            FOVring.Visible = aimEnabled
+            Button.Text = aimEnabled and "On" or "Off"
+            Button.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        end)
+    end
+end
+
+-- Tạo GUI ban đầu
+createGUI()
+
+-- Đảm bảo GUI không bị mất khi nhân vật chết hoặc reset
+LocalPlayer.CharacterAdded
+:Connect(function()
+    task.wait(1) -- Đợi một chút để GUI không bị mất
+    createGUI()
 end)
